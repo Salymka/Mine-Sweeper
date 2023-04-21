@@ -1,0 +1,77 @@
+
+.page {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+
+.gameBar {
+
+}
+
+.container {
+  box-sizing: content-box;
+  position: relative;
+  width: 600px;
+  height: 600px;
+  background-color: darkgrey;
+  display: flex;
+  flex-wrap: wrap;
+  border: 3px solid black;
+}
+
+.cell {
+  width: 60px;
+  height: 60px;
+  border: 3px solid black;
+  display: flex;
+  justify-content: center;
+  cursor: pointer;
+  align-items: center;
+  font-size: 20px;
+  background-size: cover;
+
+}
+
+.cell_open {
+  background-color: aqua;
+}
+
+.cell_flag {
+  background-color: orangered;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.cell_mined {
+  background-color: red;
+}
+
+.gameOver {
+  position: absolute;
+  width: 400px;
+  height: 200px;
+  background: red;
+  font-size: 46px;
+  opacity: 0;
+  top: 100px;
+
+  transition: opacity 1s linear;
+}
+
+.gameOver_active {
+  opacity: 1;
+}
+
+.soundtrack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  font-size: 36px;
+  background: white;
+}
