@@ -1,35 +1,43 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import styles from './App.scss';
 import bg from '../static/backgfround_image-modified.jpg';
-import bomb from '../static/bomb.png';
+import bomb from '../static/bomb2.png';
 import soundTrack from '../static/sound_track.mp3';
 import gameOverSound from '../static/game_over.wav';
 import flagImage from '../static/flag.png';
+import volumeImg from '../static/volume.png'
+import muteVolumeImg from '../static/muteVolume.png'
+import leftClickImg from '../static/left_click_mouse_icon.png'
+import middleClickImg from '../static/middle_click_mouse_icon.png'
 
 
 const App = () => {
     const [options, setOptions] = useState({
         matrixSize: 10,
         bombCount: 10,
-        volume: '',
+        volume: -1,
     });
-    const [cells, setCells] = useState(setEmptyCells(options.matrixSize));
-    const [gameOver, setGameOver] = useState(false);
-    const sound = useRef();
+    const [gameResults, setGameResults] = useState({
+        status: 'playing',
+        gameResults: ''
+    });
+    const [cells, setCells] = useState(setEmptyCells(options.matrixSize, options.bombCount));
+    const soundtrackRef = useRef();
     const gameOverSoundRef = useRef();
-    const playgroundSize = useRef();
+    const playgroundSizeRef = useRef();
 
 
-    function setEmptyCells(width) {
+    // Set cells to matrix
+    function setEmptyCells(size, bombCount) {
         const cellMatrix = [];
-        for (let i = 0; i < width; i++) {
+        for (let i = 0; i < size; i++) {
             const matrixRow = [];
-            for (let j = 0; j < width; j++) {
-                matrixRow.push({ coordinate: { x: j, y: i }, inside: 0, isOpen: false, isFlag: false });
+            for (let j = 0; j < size; j++) {
+                matrixRow.push({coordinate: {x: j, y: i}, inside: 0, isOpen: false, isFlag: false});
             }
             cellMatrix.push(matrixRow)
         }
-        return mineMatrix(options.bombCount, cellMatrix);
+        return mineMatrix(bombCount, cellMatrix);
     }
 
     function mineMatrix(mines, matrix) {
@@ -65,18 +73,28 @@ const App = () => {
         matrix.forEach((row, rowIndex) => {
             row.forEach((element, elementIndex) => {
                 if (element.inside === 'mine') {
-                    if (matrix[rowIndex - 1]?.[elementIndex - 1]) setMarker(matrix[rowIndex - 1]?.[elementIndex - 1])
-                    if (matrix[rowIndex - 1]?.[elementIndex]) setMarker(matrix[rowIndex - 1]?.[elementIndex])
-                    if (matrix[rowIndex - 1]?.[elementIndex + 1]) setMarker(matrix[rowIndex - 1]?.[elementIndex + 1])
-                    if (matrix[rowIndex]?.[elementIndex - 1]) setMarker(matrix[rowIndex]?.[elementIndex - 1])
-                    if (matrix[rowIndex]?.[elementIndex + 1]) setMarker(matrix[rowIndex]?.[elementIndex + 1])
-                    if (matrix[rowIndex + 1]?.[elementIndex - 1]) setMarker(matrix[rowIndex + 1]?.[elementIndex - 1])
-                    if (matrix[rowIndex + 1]?.[elementIndex]) setMarker(matrix[rowIndex + 1]?.[elementIndex])
-                    if (matrix[rowIndex + 1]?.[elementIndex + 1]) setMarker(matrix[rowIndex + 1]?.[elementIndex + 1])
+                    checkNeighbours(matrix, rowIndex, elementIndex);
                 }
             })
         })
         return matrix
+    }
+
+    function checkNeighbours(matrix, rowIndex, elementIndex) {
+        const neighbours = [
+            [-1, -1], [-1, 0], [-1, 1],
+            [0, -1], [0, 1],
+            [1, -1], [1, 0], [1, 1]
+        ];
+
+        neighbours.forEach(offset => {
+            const neighbourRow = rowIndex + offset[0];
+            const neighbourElement = elementIndex + offset[1];
+
+            if (matrix[neighbourRow]?.[neighbourElement]) {
+                setMarker(matrix[neighbourRow][neighbourElement]);
+            }
+        });
     }
 
     function setMarker(element) {
@@ -84,18 +102,26 @@ const App = () => {
     }
 
 
+    // Restart
+    function restartGame(matrixSize, bombCount) {
+        setGameResults({...gameResults, status: 'playing', gameResults: ''})
+        setCells(setEmptyCells(matrixSize ? matrixSize : options.matrixSize, bombCount ? bombCount : options.bombCount))
+    }
+
+
+    //Logic
     function openCell(cell) {
         const newMatrix = [...cells];
         if (cell.inside === 'mine') {
-            playGAmeOverSound()
-            newMatrix.forEach((row, rowIndex) => {
-                row.forEach((element, elementIndex) => {
+            playGameOverSound()
+            newMatrix.forEach(row => {
+                row.forEach(element => {
                     if (element.inside === 'mine') {
                         element.isOpen = true;
                     }
                 })
             })
-            return setGameOver(true)
+            return setGameResults({...gameResults, status: 'loss', gameResults: 'You Loss :(\nGAME OVER '})
         }
         if (cell.inside > 0) {
             newMatrix[cell.coordinate.y][cell.coordinate.x].isOpen = true;
@@ -110,7 +136,7 @@ const App = () => {
                     newMatrix.forEach((row, rowIndex) => {
                         row.forEach((element, elementIndex) => {
                             if (element.isOpen) {
-                                return
+                                return;
                             }
                             if (
                                 (cell[1] + 1 === element.coordinate.x ||
@@ -148,7 +174,7 @@ const App = () => {
             })
         })
         if (isCloseCells) return
-        return setGameOver(true)
+        return setGameResults({...gameResults, status: 'win', gameResults: 'You Win!!! \nTry harder settings))'})
     }
 
     function cellClick(e, cell) {
@@ -168,124 +194,167 @@ const App = () => {
         }
     }
 
-    function changeRange(event, rangeName) {
-        console.log(event.target.value)
-        const newOptions = { ...options, [rangeName]: +event.target.value };
-        setOptions({ ...newOptions })
-        setCells(setEmptyCells(event.target.value))
+    function changeBombCount(event) {
+        setOptions({...options, bombCount: +event.target.value})
+        restartGame('', +event.target.value)
     }
+
+    function changeMatrixSize(event) {
+        setOptions({...options, matrixSize: +event.target.value})
+        restartGame(+event.target.value, '')
+    }
+
+
+    //Sounds
     function toggleMute() {
-        if (!options.volume) {
-            sound.current.volume = 0.5;
-            setOptions({...options, volume: 0.5})
-            sound.current.play();
+        if (options.volume === -1) {
+            soundtrackRef.current.volume = 0.1;
+            setOptions({...options, volume: 0.1})
+            soundtrackRef.current.play();
             return;
         }
-        if (sound.current.volume === 0) {
-            sound.current.volume = options.volume;
+        if (soundtrackRef.current.volume === 0) {
+            soundtrackRef.current.volume = options.volume;
+            setOptions({...options})
             return;
         }
-        if (sound.current.volume > 0) {
-            sound.current.volume = 0;
-            return;
+        if (soundtrackRef.current.volume > 0) {
+            soundtrackRef.current.volume = 0;
+            setOptions({...options})
         }
     }
 
     function changeVolume(event) {
-        if(!options.volume){
-            sound.current.play()
+        if (options.volume === -1) {
+            soundtrackRef.current.play()
         }
-        sound.current.volume = +event.target.value
-        setOptions({ ...options, volume: +event.target.value })
+        soundtrackRef.current.volume = +event.target.value
+        setOptions({...options, volume: +event.target.value})
     }
 
-    function playGAmeOverSound() {
-        console.log(gameOverSoundRef.current.duration)
-        if(sound.current.volume > 0) {
-            gameOverSoundRef.current.volume = (sound.current.volume * 1.5 < 1) ? sound.current.volume * 1.5 : 1;
-            sound.current.volume = 0;
+    function playGameOverSound() {
+        if (soundtrackRef.current.volume > 0 && options.volume !== -1) {
+            gameOverSoundRef.current.volume = (soundtrackRef.current.volume * 1.5 < 1) ? soundtrackRef.current.volume * 1.5 : 1;
+            soundtrackRef.current.volume = 0;
             gameOverSoundRef.current.play();
             setTimeout(() => {
-                sound.current.volume = options.volume;
-            }, gameOverSoundRef.current.duration * 1000)
+                soundtrackRef.current.volume = options.volume;
+            }, gameOverSoundRef.current.duration * 1000 - 2000)
         }
     }
 
-    function restartGame() {
-        setGameOver(false)
-        setCells(setEmptyCells(options.matrixSize))
-    }
+
+
     return (
-        <div className={styles.page} style={{ backgroundImage: `url('${bg}')` }}>
+        <div className={styles.page} style={{backgroundImage: `url('${bg}')`}}>
             <div className={styles.gameBar}>
-                <div className={styles.musicBar}>
+
+                <h2 className={styles.gameBar__title}>
+                    {`Game Settings`}
+                </h2>
+                <div className={styles.gameBar__musicSettings}>
                     <button onClick={toggleMute}>
-                        mute
+                        <img
+                            src={soundtrackRef.current?.volume === 0 || options.volume === -1 ? muteVolumeImg : volumeImg}
+                            alt={'volume'}
+                            className={styles.volumeImg}/>
                     </button>
                     <input
                         type='range'
-                        nin={0}
+                        min={0}
                         max={1}
-                        step={0.1}
+                        step={0.05}
                         value={options.volume}
-                        onChange={changeVolume} />
-
+                        onChange={changeVolume}/>
                 </div>
 
-                <div className={styles.rangeBAr}>
-                    <label className={styles.rangeLabel}>
-                        {options.matrixSize}
-                    </label>
-                    <input
-                        type='range'
-                        min={5}
-                        max={15}
-                        step={1}
-                        id={'matrixRange'}
-                        value={options.matrixSize}
-                        onChange={(event) => changeRange(event, 'matrixSize')} />
-
+                <div className={styles.rangeBar}>
+                    <p className={styles.gameBar__settingTitle}>
+                        {`Playground  size  (n * n)`}
+                    </p>
+                    <div>
+                        <label className={styles.rangeLabel}>
+                            {options.matrixSize}
+                        </label>
+                        <input
+                            type='range'
+                            min={5}
+                            max={15}
+                            step={1}
+                            id={'matrixRange'}
+                            value={options.matrixSize}
+                            onChange={changeMatrixSize}/>
+                    </div>
                 </div>
-                <button onClick={restartGame}>
+
+                <div className={styles.rangeBar}>
+                    <p className={styles.gameBar__settingTitle}>
+                        {`Bomb  count`}
+                    </p>
+                    <div>
+                        <label className={styles.rangeLabel}>
+                            {options.bombCount}
+                        </label>
+                        <input
+                            type='range'
+                            min={5}
+                            max={Math.round(options.matrixSize * options.matrixSize * 0.3)}
+                            step={1}
+                            id={'matrixRange'}
+                            value={options.bombCount}
+                            onChange={changeBombCount}/>
+                    </div>
+                </div>
+
+                <button onClick={() => restartGame()} className={styles.restartBtn}>
                     RESTART
                 </button>
 
+                <div className={styles.gameBar__rules}>
+                    <div className={styles.gameBar__rule}>
+                        <img src={leftClickImg} alt={'left-click'}/>
+                        <label>
+                            {`- Open cell`}
+                        </label>
+                    </div>
+                    <div className={styles.gameBar__rule}>
+                        <img src={middleClickImg} alt={'middle-click'}/>
+                        <label>
+                            {`- Set/Unset Flag`}
+                        </label>
+                    </div>
+                </div>
             </div>
+
             <div className={styles.containerBack}>
-                <div className={styles.container} ref={playgroundSize}>
+                <div className={styles.container} ref={playgroundSizeRef}>
                     {cells &&
                         cells.map((row, rowIndex) =>
                             row.map((cell, cellIndex) =>
-
                                 <div
                                     key={`${rowIndex}-${cellIndex}`}
                                     className={`${styles.cell} ${cell.isOpen ? styles.cell_open : ''} ${cell.isFlag ? styles.cell_flag : ''} ${(cell.isOpen && cell.inside === 'mine') ? styles.cell_mined : ''}`}
                                     onMouseDown={(event) => cellClick(event, cell)}
                                     style={{
-                                        width: playgroundSize.current?.clientWidth / options.matrixSize || '',
-                                        height: playgroundSize.current?.clientWidth / options.matrixSize || '',
+                                        width: playgroundSizeRef.current?.clientWidth / options.matrixSize || '',
+                                        height: playgroundSizeRef.current?.clientWidth / options.matrixSize || '',
                                         backgroundImage: (cell.inside === 'mine' && cell.isOpen) ? `url('${bomb}')` : cell.isFlag ? `url('${flagImage}')` : '',
-                                    }}
-                                >
-                                    {((cell.inside > 0 && cell.isOpen === true) || gameOver)
+                                    }}>
+                                    {((cell.inside > 0 && cell.isOpen === true) || gameResults.status === 'loss')
                                         ? cell.inside > 0 && !cell.isFlag ? cell.inside : ''
                                         : ''}
                                 </div>
-
                             )
                         )
                     }
                 </div>
             </div>
 
-            <div className={`${styles.gameOver} ${gameOver ? styles.gameOver_active : ""}`}>
-                GAME OVER
+            <div className={`${styles.gameOver} ${gameResults.status !== 'playing' ? styles.gameOver_active : ""}`}>
+                {gameResults.gameResults}
             </div>
-            <audio className={styles.soundtrack} src={soundTrack} autoPlay ref={sound} loop>
-            </audio>
-            <audio className={styles.gameOverSound} src={gameOverSound} ref={gameOverSoundRef}>
-            </audio>
-
+            <audio src={soundTrack} autoPlay ref={soundtrackRef} loop></audio>
+            <audio src={gameOverSound} ref={gameOverSoundRef}></audio>
         </div>
     )
 };
