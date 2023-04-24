@@ -1,31 +1,35 @@
 import React, { useEffect, useRef, useState } from 'react';
-import styles from './App.scss'
-import bg from '../static/backgfround_image-modified.jpg'
-import bomb from '../static/bomb.png'
-import boom from '../static/boom.png'
-import soundTrack from '../static/sound_track.mp3'
-import flagImage from '../static/flag.png'
+import styles from './App.scss';
+import bg from '../static/backgfround_image-modified.jpg';
+import bomb from '../static/bomb.png';
+import soundTrack from '../static/sound_track.mp3';
+import gameOverSound from '../static/game_over.wav';
+import flagImage from '../static/flag.png';
+
+
 const App = () => {
     const [options, setOptions] = useState({
         matrixSize: 10,
         bombCount: 10,
-        volume: 0
-    })
-    const [cells, setCells] = useState(setEmptyCells)
-    const [gameOver, setGameOver] = useState(false)
-    const [isMute, setIsMute] = useState(true)
-    const sound = useRef()
+        volume: '',
+    });
+    const [cells, setCells] = useState(setEmptyCells(options.matrixSize));
+    const [gameOver, setGameOver] = useState(false);
+    const sound = useRef();
+    const gameOverSoundRef = useRef();
+    const playgroundSize = useRef();
 
-    function setEmptyCells() {
+
+    function setEmptyCells(width) {
         const cellMatrix = [];
-        for (let i = 0; i < options.matrixSize; i++) {
+        for (let i = 0; i < width; i++) {
             const matrixRow = [];
-            for (let j = 0; j < options.matrixSize; j++) {
-                matrixRow.push({ coordinate: { x: j, y: i }, inside: 0, isOpen: false, isFlag: false })
+            for (let j = 0; j < width; j++) {
+                matrixRow.push({ coordinate: { x: j, y: i }, inside: 0, isOpen: false, isFlag: false });
             }
             cellMatrix.push(matrixRow)
         }
-        return mineMatrix(options.bombCount, cellMatrix)
+        return mineMatrix(options.bombCount, cellMatrix);
     }
 
     function mineMatrix(mines, matrix) {
@@ -51,19 +55,15 @@ const App = () => {
         }
         uniqueList.map(item => {
             if (item[0] === couple[0] && item[1] === couple[1]) {
-                couple = randomCouple(matrixSideLength, uniqueList)
+                couple = randomCouple(matrixSideLength, uniqueList);
             }
         })
-        return couple
-
+        return couple;
     }
 
     function setMarkers(matrix) {
         matrix.forEach((row, rowIndex) => {
             row.forEach((element, elementIndex) => {
-                if (element.inside === 0) {
-                    return element
-                }
                 if (element.inside === 'mine') {
                     if (matrix[rowIndex - 1]?.[elementIndex - 1]) setMarker(matrix[rowIndex - 1]?.[elementIndex - 1])
                     if (matrix[rowIndex - 1]?.[elementIndex]) setMarker(matrix[rowIndex - 1]?.[elementIndex])
@@ -74,20 +74,20 @@ const App = () => {
                     if (matrix[rowIndex + 1]?.[elementIndex]) setMarker(matrix[rowIndex + 1]?.[elementIndex])
                     if (matrix[rowIndex + 1]?.[elementIndex + 1]) setMarker(matrix[rowIndex + 1]?.[elementIndex + 1])
                 }
-
             })
         })
         return matrix
     }
 
     function setMarker(element) {
-        if (typeof element.inside === 'number') return element.inside += 1
+        if (element.inside >= 0) return element.inside += 1;
     }
 
 
-    function openCells(cell) {
+    function openCell(cell) {
         const newMatrix = [...cells];
         if (cell.inside === 'mine') {
+            playGAmeOverSound()
             newMatrix.forEach((row, rowIndex) => {
                 row.forEach((element, elementIndex) => {
                     if (element.inside === 'mine') {
@@ -134,14 +134,28 @@ const App = () => {
                 stack.shift()
             }
         }
+        checkGameStatus(newMatrix);
         return setCells(newMatrix)
+    }
+
+    function checkGameStatus(matrix) {
+        let isCloseCells = false
+        matrix.forEach(row => {
+            row.forEach(cell => {
+                if (cell.inside >= 0 && !cell.isOpen) {
+                    isCloseCells = true
+                }
+            })
+        })
+        if (isCloseCells) return
+        return setGameOver(true)
     }
 
     function cellClick(e, cell) {
         if (e.button === 0) {
-            if (!cell.flag) {
-                return openCells(cell)
-            }
+            cell.isFlag = false;
+            return openCell(cell)
+
         }
         if (e.button === 1) {
             if (cells[cell.coordinate.y][cell.coordinate.x].isOpen === true) {
@@ -154,43 +168,61 @@ const App = () => {
         }
     }
 
-    function toggleMute() {
-        sound.current.play()
-        setIsMute(!isMute)
-        console.log(sound.current.volume);
-        const volume = sound.current.volume;
-        setOptions({...options, volume})
-    }
-
-    useEffect(() => {
-        if (sound) {
-            sound.current.muted = isMute;
-        }
-    }, [isMute]);
-
     function changeRange(event, rangeName) {
-        const newOptions = {...options};
-        newOptions[rangeName] = event.target.value;
-        setOptions(newOptions)
+        console.log(event.target.value)
+        const newOptions = { ...options, [rangeName]: +event.target.value };
+        setOptions({ ...newOptions })
+        setCells(setEmptyCells(event.target.value))
+    }
+    function toggleMute() {
+        if (!options.volume) {
+            sound.current.volume = 0.5;
+            setOptions({...options, volume: 0.5})
+            sound.current.play();
+            return;
+        }
+        if (sound.current.volume === 0) {
+            sound.current.volume = options.volume;
+            return;
+        }
+        if (sound.current.volume > 0) {
+            sound.current.volume = 0;
+            return;
+        }
     }
 
     function changeVolume(event) {
-        sound.current.volume = event.target.value
-        setOptions({...options, volume: event.target.value})
+        if(!options.volume){
+            sound.current.play()
+        }
+        sound.current.volume = +event.target.value
+        setOptions({ ...options, volume: +event.target.value })
     }
 
-    function restartGame(){
+    function playGAmeOverSound() {
+        console.log(gameOverSoundRef.current.duration)
+        if(sound.current.volume > 0) {
+            gameOverSoundRef.current.volume = (sound.current.volume * 1.5 < 1) ? sound.current.volume * 1.5 : 1;
+            sound.current.volume = 0;
+            gameOverSoundRef.current.play();
+            setTimeout(() => {
+                sound.current.volume = options.volume;
+            }, gameOverSoundRef.current.duration * 1000)
+        }
+    }
+
+    function restartGame() {
         setGameOver(false)
-        setCells(setEmptyCells)
+        setCells(setEmptyCells(options.matrixSize))
     }
     return (
         <div className={styles.page} style={{ backgroundImage: `url('${bg}')` }}>
             <div className={styles.gameBar}>
                 <div className={styles.musicBar}>
-                <button onClick={toggleMute}>
-                    mute
-                </button>
-                <input
+                    <button onClick={toggleMute}>
+                        mute
+                    </button>
+                    <input
                         type='range'
                         nin={0}
                         max={1}
@@ -199,14 +231,14 @@ const App = () => {
                         onChange={changeVolume} />
 
                 </div>
-                
+
                 <div className={styles.rangeBAr}>
-                    <label for={'matrixRange'} className={styles.rangeLabel}>
+                    <label className={styles.rangeLabel}>
                         {options.matrixSize}
                     </label>
                     <input
                         type='range'
-                        nin={5}
+                        min={5}
                         max={15}
                         step={1}
                         id={'matrixRange'}
@@ -219,29 +251,39 @@ const App = () => {
                 </button>
 
             </div>
-            <div className={styles.container}>
-                {cells &&
-                    cells.map((row, rowIndex) =>
-                        row.map((cell, cellIndex) =>
-                            <div
-                                key={`${rowIndex}-${cellIndex}`}
-                                className={`${styles.cell} ${cell.isOpen ? styles.cell_open : ''} ${cell.isFlag ? styles.cell_flag : ''} ${(cell.isOpen && cell.inside === 'mine') ? styles.cell_mined : ''}`}
-                                onMouseDown={(event) => cellClick(event, cell)}
-                                style={(cell.inside === 'mine' && cell.isOpen) ? { backgroundImage: `url('${bomb}')` } : cell.isFlag ? { backgroundImage: `url('${flagImage}')` } : {}}
-                            >
-                                {((cell.inside > 0 && cell.isOpen === true) || gameOver)
-                                    ? cell.inside > 0 && !cell.isFlag ? cell.inside : ''
-                                    : ''}
-                            </div>
+            <div className={styles.containerBack}>
+                <div className={styles.container} ref={playgroundSize}>
+                    {cells &&
+                        cells.map((row, rowIndex) =>
+                            row.map((cell, cellIndex) =>
+
+                                <div
+                                    key={`${rowIndex}-${cellIndex}`}
+                                    className={`${styles.cell} ${cell.isOpen ? styles.cell_open : ''} ${cell.isFlag ? styles.cell_flag : ''} ${(cell.isOpen && cell.inside === 'mine') ? styles.cell_mined : ''}`}
+                                    onMouseDown={(event) => cellClick(event, cell)}
+                                    style={{
+                                        width: playgroundSize.current?.clientWidth / options.matrixSize || '',
+                                        height: playgroundSize.current?.clientWidth / options.matrixSize || '',
+                                        backgroundImage: (cell.inside === 'mine' && cell.isOpen) ? `url('${bomb}')` : cell.isFlag ? `url('${flagImage}')` : '',
+                                    }}
+                                >
+                                    {((cell.inside > 0 && cell.isOpen === true) || gameOver)
+                                        ? cell.inside > 0 && !cell.isFlag ? cell.inside : ''
+                                        : ''}
+                                </div>
+
+                            )
                         )
-                    )
-                }
+                    }
+                </div>
             </div>
+
             <div className={`${styles.gameOver} ${gameOver ? styles.gameOver_active : ""}`}>
                 GAME OVER
             </div>
-            <audio className={styles.soundtrack} src={soundTrack} muted={isMute} ref={sound} loop>
-
+            <audio className={styles.soundtrack} src={soundTrack} autoPlay ref={sound} loop>
+            </audio>
+            <audio className={styles.gameOverSound} src={gameOverSound} ref={gameOverSoundRef}>
             </audio>
 
         </div>

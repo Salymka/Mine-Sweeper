@@ -20,6 +20,7 @@
 } 
 input[type=range]{
   margin-left: 5px;
+  background-color: red;
 }
 
 .rangeBar {
@@ -40,15 +41,21 @@ input[type=range]{
   width: 20px;
 }
 
-.container {
+.containerBack {
   box-sizing: content-box;
+  width: 600px;
+  height: 600px;
+  border: 3px solid black;
+}
+
+.container {
+  box-sizing: border-box;
   position: relative;
   width: 600px;
   height: 600px;
   background-color: darkgrey;
   display: flex;
   flex-wrap: wrap;
-  border: 3px solid black;
 }
 
 .cell {
